@@ -18,7 +18,11 @@
       "Bash(./tests/test_stuck_loop_detection.sh:*)",
       "Bash(git mv:*)",
       "WebFetch(domain:about.codecov.io)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet run:*)",
+      "Bash(echo:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
