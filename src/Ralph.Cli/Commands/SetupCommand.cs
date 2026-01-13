@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Ralph.Cli.Services;
 using Spectre.Console;
 
 namespace Ralph.Cli.Commands;
@@ -14,17 +15,23 @@ public static class SetupCommand
             description: "Name of the project to create",
             getDefaultValue: () => null);
 
-        command.AddArgument(nameArgument);
+        var agentOption = new Option<string?>(
+            name: "--agent",
+            description: "Agent template to use (e.g., 'dotnet-cli', 'dotnet-asp-mvc'). If not specified, prompts for selection.");
+        agentOption.AddAlias("-a");
 
-        command.SetHandler(async (name) =>
+        command.AddArgument(nameArgument);
+        command.AddOption(agentOption);
+
+        command.SetHandler(async (name, agent) =>
         {
-            await ExecuteAsync(name);
-        }, nameArgument);
+            await ExecuteAsync(name, agent);
+        }, nameArgument, agentOption);
 
         return command;
     }
 
-    public static async Task ExecuteAsync(string? projectName)
+    public static async Task ExecuteAsync(string? projectName, string? agentTemplate = null)
     {
         // Determine project name
         if (string.IsNullOrEmpty(projectName))
@@ -47,11 +54,14 @@ public static class SetupCommand
         AnsiConsole.MarkupLine($"[dim]Target directory: {targetDir}[/]");
         AnsiConsole.WriteLine();
 
+        // Select agent template
+        var selectedAgent = await SelectAgentTemplateAsync(agentTemplate);
+
         // Create directory structure
         await CreateDirectoryStructureAsync(targetDir, isNewDirectory);
 
         // Create template files
-        await CreateTemplateFilesAsync(targetDir, projectName);
+        await CreateTemplateFilesAsync(targetDir, projectName, selectedAgent);
 
         // Initialize git repository
         await InitializeGitAsync(targetDir);
@@ -97,30 +107,93 @@ public static class SetupCommand
         AnsiConsole.MarkupLine("[green]✓[/] Directory structure created");
     }
 
-    private static async Task CreateTemplateFilesAsync(string targetDir, string projectName)
+    private static async Task<AgentTemplateInfo> SelectAgentTemplateAsync(string? agentTemplateName)
+    {
+        var templates = TemplateService.GetAgentTemplates();
+
+        // If agent template specified via command line, find it
+        if (!string.IsNullOrEmpty(agentTemplateName))
+        {
+            var matchingTemplate = templates.FirstOrDefault(t =>
+                t.FileName.Equals(agentTemplateName + ".md", StringComparison.OrdinalIgnoreCase) ||
+                t.FileName.Equals(agentTemplateName, StringComparison.OrdinalIgnoreCase) ||
+                t.Name.Equals(agentTemplateName, StringComparison.OrdinalIgnoreCase));
+
+            if (matchingTemplate != null)
+            {
+                AnsiConsole.MarkupLine($"[green]✓[/] Using agent template: [cyan]{matchingTemplate.Name}[/]");
+                return matchingTemplate;
+            }
+
+            AnsiConsole.MarkupLine($"[yellow]![/] Agent template '{agentTemplateName}' not found. Available templates:");
+            foreach (var t in templates)
+            {
+                AnsiConsole.MarkupLine($"    [dim]-[/] {t.FileName.Replace(".md", "")}");
+            }
+            AnsiConsole.WriteLine();
+        }
+
+        // Prompt user to select a template
+        var selected = AnsiConsole.Prompt(
+            new SelectionPrompt<AgentTemplateInfo>()
+                .Title("[bold]Select an agent template:[/]")
+                .PageSize(10)
+                .MoreChoicesText("[grey](Move up and down to see more templates)[/]")
+                .UseConverter(t => $"{t.Name} - [dim]{t.Description}[/]")
+                .AddChoices(templates));
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Selected: [cyan]{selected.Name}[/]");
+        return selected;
+    }
+
+    private static async Task CreateTemplateFilesAsync(string targetDir, string projectName, AgentTemplateInfo selectedAgent)
     {
         AnsiConsole.Status()
             .Start("Creating template files...", ctx =>
             {
-                // Create PROMPT.md
+                // Create PROMPT.md from embedded template
                 var promptPath = Path.Combine(targetDir, "PROMPT.md");
                 if (!File.Exists(promptPath))
                 {
-                    File.WriteAllText(promptPath, GetPromptTemplate(projectName));
+                    var promptContent = TemplateService.GetTemplateContent("PROMPT.md");
+                    if (promptContent != null)
+                    {
+                        // Replace placeholder with project name
+                        promptContent = promptContent.Replace("[YOUR PROJECT NAME]", projectName);
+                        File.WriteAllText(promptPath, promptContent);
+                    }
+                    else
+                    {
+                        File.WriteAllText(promptPath, GetPromptTemplate(projectName));
+                    }
                 }
 
-                // Create @fix_plan.md
+                // Create @fix_plan.md from embedded template
                 var fixPlanPath = Path.Combine(targetDir, "@fix_plan.md");
                 if (!File.Exists(fixPlanPath))
                 {
-                    File.WriteAllText(fixPlanPath, GetFixPlanTemplate());
+                    var fixPlanContent = TemplateService.GetTemplateContent("fix_plan.md");
+                    File.WriteAllText(fixPlanPath, fixPlanContent ?? GetFixPlanTemplate());
                 }
 
-                // Create @AGENT.md
+                // Create @AGENT.md from selected agent template
                 var agentPath = Path.Combine(targetDir, "@AGENT.md");
                 if (!File.Exists(agentPath))
                 {
-                    File.WriteAllText(agentPath, GetAgentTemplate(projectName));
+                    var agentContent = TemplateService.GetAgentTemplateContent(selectedAgent.ResourceName);
+                    if (agentContent != null)
+                    {
+                        // Replace project name placeholder if present
+                        agentContent = agentContent.Replace("MyAgentProject", projectName);
+                        agentContent = agentContent.Replace("MyAgentWeb", projectName);
+                        agentContent = agentContent.Replace("MyAgentApi", projectName + ".Api");
+                        agentContent = agentContent.Replace("MyAgentFrontend", projectName + ".Frontend");
+                        File.WriteAllText(agentPath, agentContent);
+                    }
+                    else
+                    {
+                        File.WriteAllText(agentPath, GetAgentTemplate(projectName));
+                    }
                 }
 
                 // Create README.md

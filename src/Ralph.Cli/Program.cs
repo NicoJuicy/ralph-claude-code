@@ -10,7 +10,7 @@ class Program
     static async Task<int> Main(string[] args)
     {
         // Create root command
-        var rootCommand = new RootCommand("Ralph - Autonomous AI development loop system");
+        var rootCommand = new RootCommand("yolo - Autonomous AI development loop system");
 
         // Add commands
         rootCommand.AddCommand(LoopCommand.Create());

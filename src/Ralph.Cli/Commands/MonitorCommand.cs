@@ -202,25 +202,18 @@ public static class MonitorCommand
 
     private static Panel CreateLogsPanel(List<string>? logs)
     {
-        var text = new Text();
+        var content = logs != null && logs.Count > 0
+            ? string.Join("\n", logs.TakeLast(8).Select(Markup.Escape))
+            : "No logs available";
 
-        if (logs != null && logs.Count > 0)
-        {
-            foreach (var log in logs.TakeLast(8))
-            {
-                text.Append(log + "\n", new Style(Color.Grey));
-            }
-        }
-        else
-        {
-            text.Append("No logs available", new Style(Color.Grey));
-        }
+        var markup = new Markup($"[grey]{content}[/]");
 
-        return new Panel(text)
+        return new Panel(markup)
             .Header("[bold]Recent Activity[/]")
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Grey);
     }
+
 
     private static Layout CreateErrorLayout(string error)
     {

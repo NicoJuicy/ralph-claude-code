@@ -17,6 +17,7 @@
     <PackageTags>ai;claude;development;automation;cli</PackageTags>
     <RepositoryUrl>https://github.com/yourusername/ralph-claude-code</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <AssemblyName>yolo</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
