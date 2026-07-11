@@ -123,7 +123,7 @@ You are Ralph, an autonomous AI development agent working on a Task Management A
 
 ## Current Objectives
 1. Study specs/* to learn about the project specifications
-2. Review @fix_plan.md for current priorities
+2. Review fix_plan.md for current priorities
 3. Implement the highest priority item using best practices
 4. Use parallel subagents for complex tasks (max 100 concurrent)
 5. Run tests after each implementation
@@ -134,7 +134,7 @@ You are Ralph, an autonomous AI development agent working on a Task Management A
 - Search the codebase before assuming something isn't implemented
 - Use subagents for expensive operations (file searching, analysis)
 - Write comprehensive tests with clear documentation
-- Update @fix_plan.md with your learnings
+- Update fix_plan.md with your learnings
 - Commit working changes with descriptive messages
 
 ## 🧪 Testing Guidelines (CRITICAL)
@@ -145,13 +145,13 @@ You are Ralph, an autonomous AI development agent working on a Task Management A
 - Focus on CORE functionality first, comprehensive testing later
 
 ## Current Task
-Follow @fix_plan.md and choose the most important item to implement next.
+Follow fix_plan.md and choose the most important item to implement next.
 EOF
 }
 
-# Sample @fix_plan.md
+# Sample fix_plan.md
 create_sample_fix_plan() {
-    local file=${1:-"@fix_plan.md"}
+    local file=${1:-"fix_plan.md"}
     local total=${2:-10}
     local completed=${3:-3}
 
@@ -203,9 +203,9 @@ EOF
 EOF
 }
 
-# Sample @AGENT.md
+# Sample AGENT.md
 create_sample_agent_md() {
-    local file=${1:-"@AGENT.md"}
+    local file=${1:-"AGENT.md"}
     cat > "$file" << 'EOF'
 # Agent Build Instructions
 
@@ -260,7 +260,7 @@ Created the following files:
 Running tests...
 ✓ All tests passed (5/5)
 
-Updating @fix_plan.md...
+Updating fix_plan.md...
 Completed: Set up basic project structure
 
 Ready for next task.
@@ -353,20 +353,123 @@ EOF
 }
 
 # Create complete test project structure
+# Creates .ralph/ subfolder structure for Ralph-specific files
 create_test_project() {
     local project_dir=${1:-"test_project"}
 
-    mkdir -p "$project_dir"/{specs/stdlib,src,examples,logs,docs/generated}
+    # Create project with .ralph/ subfolder structure
+    mkdir -p "$project_dir"/src
+    mkdir -p "$project_dir"/.ralph/{specs/stdlib,examples,logs,docs/generated}
 
     cd "$project_dir" || return 1
 
-    create_sample_prompt "PROMPT.md"
-    create_sample_fix_plan "@fix_plan.md" 10 3
-    create_sample_agent_md "@AGENT.md"
+    # Create Ralph files in .ralph/ subdirectory
+    create_sample_prompt ".ralph/PROMPT.md"
+    create_sample_fix_plan ".ralph/fix_plan.md" 10 3
+    create_sample_agent_md ".ralph/AGENT.md"
 
-    echo "0" > .call_count
-    echo "$(date +%Y%m%d%H)" > .last_reset
-    echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": []}' > .exit_signals
+    # Create state files in .ralph/
+    echo "0" > .ralph/.call_count
+    echo "$(date +%Y%m%d%H)" > .ralph/.last_reset
+    echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": []}' > .ralph/.exit_signals
 
     cd - > /dev/null || return 1
+}
+
+# Sample stream-json output with rate_limit_event status:rejected (real API limit)
+create_sample_stream_json_rate_limit_rejected() {
+    local file=${1:-"claude_output.log"}
+    cat > "$file" << 'EOF'
+{"type":"system","subtype":"init","session_id":"abc123","tools":["Read","Write","Edit","Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll analyze the code..."}]}}
+{"type":"result","subtype":"rate_limit_event","rate_limit_event":{"type":"rate_limit","status":"rejected","message":"You have exceeded your 5-hour usage limit. Please try again later."}}
+EOF
+}
+
+# =============================================================================
+# Task import fixtures (beads / GitHub Issues) — for test_task_imports.bats
+# =============================================================================
+
+# Sample beads JSON with mixed statuses (open / in_progress / closed)
+create_sample_beads_json() {
+    cat << 'EOF'
+[
+  {"id":"proj-001","title":"Fix authentication bug","status":"open","priority":"P1"},
+  {"id":"proj-002","title":"Add dark mode toggle","status":"in_progress","priority":"P2"},
+  {"id":"proj-003","title":"Migrate old API","status":"closed","priority":"P3"},
+  {"id":"proj-004","title":"Write docs","status":"open","priority":"P2"}
+]
+EOF
+}
+
+# Empty beads JSON
+create_sample_beads_json_empty() {
+    echo "[]"
+}
+
+# Malformed JSON to trigger fallback path
+create_sample_beads_json_malformed() {
+    echo '[{"id":"proj-001","title":"Broken'
+}
+
+# JSON with entries missing id/title — exercises jq guards from PR #150
+create_sample_beads_json_missing_fields() {
+    cat << 'EOF'
+[
+  {"id":"proj-001","title":"Has both fields","status":"open"},
+  {"id":"","title":"Missing id","status":"open"},
+  {"id":"proj-003","title":"","status":"open"},
+  {"title":"No id key","status":"open"},
+  {"id":"proj-005","status":"open"}
+]
+EOF
+}
+
+# Text-format bd list output (used when JSON path fails)
+create_sample_beads_text() {
+    cat << 'EOF'
+○ proj-001 [● P2] [task] - Fix authentication bug
+◐ proj-002 [● P1] [task] - Add dark mode toggle
+● proj-003 [● P3] [task] - Migrate old API
+○ proj-004 [● P2] [task] - Write docs
+EOF
+}
+
+# GitHub issues JSON without labels
+create_sample_github_json() {
+    cat << 'EOF'
+[
+  {"number":123,"title":"Add feature X","labels":[]},
+  {"number":124,"title":"Fix bug Y","labels":[]},
+  {"number":125,"title":"Refactor Z","labels":[]}
+]
+EOF
+}
+
+# Empty GitHub issues JSON
+create_sample_github_json_empty() {
+    echo "[]"
+}
+
+# GitHub issues JSON with labels (for label-filtering tests)
+create_sample_github_json_with_labels() {
+    cat << 'EOF'
+[
+  {"number":201,"title":"Tagged task one","labels":[{"name":"ralph-task"}]},
+  {"number":202,"title":"Tagged task two","labels":[{"name":"ralph-task"},{"name":"bug"}]}
+]
+EOF
+}
+
+# Sample stream-json output with prompt echo containing "5-hour limit" text (false positive scenario)
+# rate_limit_event shows status:allowed, but type:user lines contain echoed file content
+create_sample_stream_json_with_prompt_echo() {
+    local file=${1:-"claude_output.log"}
+    cat > "$file" << 'EOF'
+{"type":"system","subtype":"init","session_id":"abc123","tools":["Read","Write","Edit","Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me read the prompt file..."}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_abc","content":"# Ralph Instructions\n\nNote: Be aware of the 5-hour usage limit for Claude API.\nIf the limit is reached, try again back later.\nUsage limit reached means you should wait."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I see the instructions. Working on the task now..."}]}}
+{"type":"result","subtype":"rate_limit_event","rate_limit_event":{"type":"rate_limit","status":"allowed","remaining":42}}
+EOF
 }

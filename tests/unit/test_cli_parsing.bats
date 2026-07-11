@@ -19,13 +19,14 @@ setup() {
     git config user.email "test@example.com"
     git config user.name "Test User"
 
-    # Set up required environment
-    export PROMPT_FILE="PROMPT.md"
-    export LOG_DIR="logs"
-    export STATUS_FILE="status.json"
-    export EXIT_SIGNALS_FILE=".exit_signals"
-    export CALL_COUNT_FILE=".call_count"
-    export TIMESTAMP_FILE=".last_reset"
+    # Set up required environment with .ralph/ subfolder structure
+    export RALPH_DIR=".ralph"
+    export PROMPT_FILE="$RALPH_DIR/PROMPT.md"
+    export LOG_DIR="$RALPH_DIR/logs"
+    export STATUS_FILE="$RALPH_DIR/status.json"
+    export EXIT_SIGNALS_FILE="$RALPH_DIR/.exit_signals"
+    export CALL_COUNT_FILE="$RALPH_DIR/.call_count"
+    export TIMESTAMP_FILE="$RALPH_DIR/.last_reset"
 
     mkdir -p "$LOG_DIR"
 
@@ -38,6 +39,7 @@ setup() {
     # Create lib directory with circuit breaker stub
     mkdir -p lib
     cat > lib/circuit_breaker.sh << 'EOF'
+RALPH_DIR="${RALPH_DIR:-.ralph}"
 reset_circuit_breaker() { echo "Circuit breaker reset: $1"; }
 show_circuit_status() { echo "Circuit breaker status: CLOSED"; }
 init_circuit_breaker() { :; }
@@ -45,6 +47,7 @@ record_loop_result() { :; }
 EOF
 
     cat > lib/response_analyzer.sh << 'EOF'
+RALPH_DIR="${RALPH_DIR:-.ralph}"
 analyze_response() { :; }
 detect_output_format() { echo "text"; }
 EOF
@@ -358,4 +361,106 @@ EOF
     run bash "$RALPH_SCRIPT" -t 30 --help
 
     assert_success
+}
+
+# =============================================================================
+# MONITOR PARAMETER FORWARDING TESTS (Issue #120)
+# Tests that --monitor correctly forwards all CLI parameters to the inner loop
+# =============================================================================
+
+# Helper function to extract the ralph_cmd that would be built in setup_tmux_session
+# This sources ralph_loop.sh and simulates the parameter forwarding logic
+build_ralph_cmd_for_test() {
+    local ralph_cmd="ralph"
+    local MAX_CALLS_PER_HOUR="${1:-100}"
+    local PROMPT_FILE="${2:-.ralph/PROMPT.md}"
+    local CLAUDE_OUTPUT_FORMAT="${3:-json}"
+    local VERBOSE_PROGRESS="${4:-false}"
+    local CLAUDE_TIMEOUT_MINUTES="${5:-15}"
+    local CLAUDE_ALLOWED_TOOLS="${6:-Write,Read,Edit,Bash(git add *),Bash(git commit *),Bash(git diff *),Bash(git log *),Bash(git status),Bash(git status *),Bash(git push *),Bash(git pull *),Bash(git fetch *),Bash(git checkout *),Bash(git branch *),Bash(git stash *),Bash(git merge *),Bash(git tag *),Bash(npm *),Bash(pytest)}"
+    local CLAUDE_USE_CONTINUE="${7:-true}"
+    local CLAUDE_SESSION_EXPIRY_HOURS="${8:-24}"
+    local RALPH_DIR=".ralph"
+
+    # Forward --calls if non-default
+    if [[ "$MAX_CALLS_PER_HOUR" != "100" ]]; then
+        ralph_cmd="$ralph_cmd --calls $MAX_CALLS_PER_HOUR"
+    fi
+    # Forward --prompt if non-default
+    if [[ "$PROMPT_FILE" != "$RALPH_DIR/PROMPT.md" ]]; then
+        ralph_cmd="$ralph_cmd --prompt '$PROMPT_FILE'"
+    fi
+    # Forward --output-format if non-default (default is json)
+    if [[ "$CLAUDE_OUTPUT_FORMAT" != "json" ]]; then
+        ralph_cmd="$ralph_cmd --output-format $CLAUDE_OUTPUT_FORMAT"
+    fi
+    # Forward --verbose if enabled
+    if [[ "$VERBOSE_PROGRESS" == "true" ]]; then
+        ralph_cmd="$ralph_cmd --verbose"
+    fi
+    # Forward --timeout if non-default (default is 15)
+    if [[ "$CLAUDE_TIMEOUT_MINUTES" != "15" ]]; then
+        ralph_cmd="$ralph_cmd --timeout $CLAUDE_TIMEOUT_MINUTES"
+    fi
+    # Forward --allowed-tools if non-default
+    if [[ "$CLAUDE_ALLOWED_TOOLS" != "Write,Read,Edit,Bash(git add *),Bash(git commit *),Bash(git diff *),Bash(git log *),Bash(git status),Bash(git status *),Bash(git push *),Bash(git pull *),Bash(git fetch *),Bash(git checkout *),Bash(git branch *),Bash(git stash *),Bash(git merge *),Bash(git tag *),Bash(npm *),Bash(pytest)" ]]; then
+        ralph_cmd="$ralph_cmd --allowed-tools '$CLAUDE_ALLOWED_TOOLS'"
+    fi
+    # Forward --no-continue if session continuity disabled
+    if [[ "$CLAUDE_USE_CONTINUE" == "false" ]]; then
+        ralph_cmd="$ralph_cmd --no-continue"
+    fi
+    # Forward --session-expiry if non-default (default is 24)
+    if [[ "$CLAUDE_SESSION_EXPIRY_HOURS" != "24" ]]; then
+        ralph_cmd="$ralph_cmd --session-expiry $CLAUDE_SESSION_EXPIRY_HOURS"
+    fi
+
+    echo "$ralph_cmd"
+}
+
+@test "monitor forwards --output-format text parameter" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "text")
+    [[ "$result" == *"--output-format text"* ]]
+}
+
+@test "monitor forwards --verbose parameter" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "json" "true")
+    [[ "$result" == *"--verbose"* ]]
+}
+
+@test "monitor forwards --timeout parameter" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "json" "false" "30")
+    [[ "$result" == *"--timeout 30"* ]]
+}
+
+@test "monitor forwards --allowed-tools parameter" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "json" "false" "15" "Read,Write")
+    [[ "$result" == *"--allowed-tools 'Read,Write'"* ]]
+}
+
+@test "monitor forwards --no-continue parameter" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "json" "false" "15" "Write,Bash(git *),Read" "false")
+    [[ "$result" == *"--no-continue"* ]]
+}
+
+@test "monitor forwards --session-expiry parameter" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "json" "false" "15" "Write,Bash(git *),Read" "true" "48")
+    [[ "$result" == *"--session-expiry 48"* ]]
+}
+
+@test "monitor forwards multiple parameters together" {
+    local result=$(build_ralph_cmd_for_test 50 ".ralph/PROMPT.md" "text" "true" "30" "Read,Write" "false" "12")
+    [[ "$result" == *"--calls 50"* ]]
+    [[ "$result" == *"--output-format text"* ]]
+    [[ "$result" == *"--verbose"* ]]
+    [[ "$result" == *"--timeout 30"* ]]
+    [[ "$result" == *"--allowed-tools 'Read,Write'"* ]]
+    [[ "$result" == *"--no-continue"* ]]
+    [[ "$result" == *"--session-expiry 12"* ]]
+}
+
+@test "monitor does not forward default parameters" {
+    local result=$(build_ralph_cmd_for_test 100 ".ralph/PROMPT.md" "json" "false" "15" "Write,Read,Edit,Bash(git add *),Bash(git commit *),Bash(git diff *),Bash(git log *),Bash(git status),Bash(git status *),Bash(git push *),Bash(git pull *),Bash(git fetch *),Bash(git checkout *),Bash(git branch *),Bash(git stash *),Bash(git merge *),Bash(git tag *),Bash(npm *),Bash(pytest)" "true" "24")
+    # Should only be "ralph" with no extra flags
+    [[ "$result" == "ralph" ]]
 }

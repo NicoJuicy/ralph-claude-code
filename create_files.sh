@@ -6,7 +6,9 @@ set -e
 echo "🚀 Creating Ralph for Claude Code repository structure..."
 
 # Create directories
-mkdir -p {logs,docs/generated,specs/stdlib,src,examples,templates/specs}
+# Note: Project structure uses .ralph/ subfolder for Ralph-specific files
+# src/ stays at root for compatibility with existing tooling
+mkdir -p {src,templates/specs}
 
 # Create main scripts
 cat > ralph_loop.sh << 'EOF'
@@ -17,19 +19,20 @@ cat > ralph_loop.sh << 'EOF'
 
 set -e  # Exit on any error
 
-# Configuration
-PROMPT_FILE="PROMPT.md"
-LOG_DIR="logs"
-DOCS_DIR="docs/generated"
-STATUS_FILE="status.json"
+# Configuration - Ralph files live in .ralph/ subfolder
+RALPH_DIR="${RALPH_DIR:-.ralph}"
+PROMPT_FILE="$RALPH_DIR/PROMPT.md"
+LOG_DIR="$RALPH_DIR/logs"
+DOCS_DIR="$RALPH_DIR/docs/generated"
+STATUS_FILE="$RALPH_DIR/status.json"
 CLAUDE_CODE_CMD="npx @anthropic/claude-code"
 MAX_CALLS_PER_HOUR=100  # Adjust based on your plan
 SLEEP_DURATION=3600     # 1 hour in seconds
-CALL_COUNT_FILE=".call_count"
-TIMESTAMP_FILE=".last_reset"
+CALL_COUNT_FILE="$RALPH_DIR/.call_count"
+TIMESTAMP_FILE="$RALPH_DIR/.last_reset"
 
 # Exit detection configuration
-EXIT_SIGNALS_FILE=".exit_signals"
+EXIT_SIGNALS_FILE="$RALPH_DIR/.exit_signals"
 MAX_CONSECUTIVE_TEST_LOOPS=3
 MAX_CONSECUTIVE_DONE_SIGNALS=2
 TEST_PERCENTAGE_THRESHOLD=30  # If more than 30% of recent loops are test-only, flag it
@@ -201,10 +204,13 @@ should_exit_gracefully() {
     fi
     
     # 4. Check fix_plan.md for completion
-    if [[ -f "@fix_plan.md" ]]; then
-        local total_items=$(grep -c "^- \[" "@fix_plan.md" 2>/dev/null || echo "0")
-        local completed_items=$(grep -c "^- \[x\]" "@fix_plan.md" 2>/dev/null || echo "0")
-        
+    # Fix #144: Only match valid markdown checkboxes, not date entries like [2026-01-29]
+    # Valid patterns: "- [ ]" (uncompleted) and "- [x]" or "- [X]" (completed)
+    if [[ -f "$RALPH_DIR/fix_plan.md" ]]; then
+        local uncompleted_items=$(grep -cE "^[[:space:]]*- \[ \]" "$RALPH_DIR/fix_plan.md" 2>/dev/null || echo "0")
+        local completed_items=$(grep -cE "^[[:space:]]*- \[[xX]\]" "$RALPH_DIR/fix_plan.md" 2>/dev/null || echo "0")
+        local total_items=$((uncompleted_items + completed_items))
+
         if [[ $total_items -gt 0 ]] && [[ $completed_items -eq $total_items ]]; then
             log_status "WARN" "Exit condition: All fix_plan.md items completed ($completed_items/$total_items)"
             echo "plan_complete"
@@ -377,8 +383,9 @@ cat > ralph_monitor.sh << 'EOF'
 # Ralph Status Monitor - Live terminal dashboard for the Ralph loop
 set -e
 
-STATUS_FILE="status.json"
-LOG_FILE="logs/ralph.log"
+RALPH_DIR="${RALPH_DIR:-.ralph}"
+STATUS_FILE="$RALPH_DIR/status.json"
+LOG_FILE="$RALPH_DIR/logs/ralph.log"
 REFRESH_INTERVAL=2
 
 # Colors
@@ -482,6 +489,7 @@ cat > setup.sh << 'EOF'
 #!/bin/bash
 
 # Ralph Project Setup Script
+# Creates project structure with Ralph-specific files in .ralph/ subfolder
 set -e
 
 PROJECT_NAME=${1:-"my-project"}
@@ -492,14 +500,17 @@ echo "🚀 Setting up Ralph project: $PROJECT_NAME"
 mkdir -p "$PROJECT_NAME"
 cd "$PROJECT_NAME"
 
-# Create structure
-mkdir -p {specs/stdlib,src,examples,logs,docs/generated}
+# Create structure:
+# - src/ stays at root for compatibility with existing tooling
+# - All Ralph-specific files go in .ralph/ subfolder
+mkdir -p src
+mkdir -p .ralph/{specs/stdlib,examples,logs,docs/generated}
 
-# Copy templates
-cp ../templates/PROMPT.md .
-cp ../templates/fix_plan.md @fix_plan.md
-cp ../templates/AGENT.md @AGENT.md
-cp -r ../templates/specs/* specs/ 2>/dev/null || true
+# Copy templates to .ralph/
+cp ../templates/PROMPT.md .ralph/
+cp ../templates/fix_plan.md .ralph/fix_plan.md
+cp ../templates/AGENT.md .ralph/AGENT.md
+cp -r ../templates/specs/* .ralph/specs/ 2>/dev/null || true
 
 # Initialize git
 git init
@@ -509,8 +520,8 @@ git commit -m "Initial Ralph project setup"
 
 echo "✅ Project $PROJECT_NAME created!"
 echo "Next steps:"
-echo "  1. Edit PROMPT.md with your project requirements"
-echo "  2. Update specs/ with your project specifications"  
+echo "  1. Edit .ralph/PROMPT.md with your project requirements"
+echo "  2. Update .ralph/specs/ with your project specifications"
 echo "  3. Run: ../ralph_loop.sh"
 echo "  4. Monitor: ../ralph_monitor.sh"
 EOF
@@ -525,20 +536,31 @@ cat > templates/PROMPT.md << 'EOF'
 You are Ralph, an autonomous AI development agent working on a [YOUR PROJECT NAME] project.
 
 ## Current Objectives
-1. Study specs/* to learn about the project specifications
-2. Review @fix_plan.md for current priorities
+1. Study .ralph/specs/* to learn about the project specifications
+2. Review .ralph/fix_plan.md for current priorities
 3. Implement the highest priority item using best practices
 4. Use parallel subagents for complex tasks (max 100 concurrent)
 5. Run tests after each implementation
-6. Update documentation and fix_plan.md
+6. Update documentation and .ralph/fix_plan.md
 
 ## Key Principles
 - ONE task per loop - focus on the most important thing
 - Search the codebase before assuming something isn't implemented
 - Use subagents for expensive operations (file searching, analysis)
 - Write comprehensive tests with clear documentation
-- Update @fix_plan.md with your learnings
+- Update .ralph/fix_plan.md with your learnings
 - Commit working changes with descriptive messages
+
+## Protected Files (DO NOT MODIFY)
+The following files and directories are part of Ralph's infrastructure.
+NEVER delete, move, rename, or overwrite these under any circumstances:
+- .ralph/ (entire directory and all contents)
+- .ralphrc (project configuration)
+
+When performing cleanup, refactoring, or restructuring tasks:
+- These files are NOT part of your project code
+- They are Ralph's internal control files that keep the development loop running
+- Deleting them will break Ralph and halt all autonomous development
 
 ## 🧪 Testing Guidelines (CRITICAL)
 - LIMIT testing to ~20% of your total effort per loop
@@ -552,27 +574,27 @@ You are Ralph, an autonomous AI development agent working on a [YOUR PROJECT NAM
 - Before making changes: search codebase using subagents
 - After implementation: run ESSENTIAL tests for the modified code only
 - If tests fail: fix them as part of your current work
-- Keep @AGENT.md updated with build/run instructions
+- Keep AGENT.md updated with build/run instructions
 - Document the WHY behind tests and implementations
 - No placeholder implementations - build it properly
 
 ## Completion Awareness
 If you believe the project is complete or nearly complete:
-- Update @fix_plan.md to reflect completion status
+- Update .ralph/fix_plan.md to reflect completion status
 - Summarize what has been accomplished
 - Note any remaining minor tasks
 - Do NOT continue with busy work like extensive testing
 - Do NOT implement features not in the specifications
 
 ## File Structure
-- specs/: Project specifications and requirements
-- src/: Source code implementation  
-- examples/: Example usage and test cases
-- @fix_plan.md: Prioritized TODO list
-- @AGENT.md: Project build and run instructions
+- .ralph/specs/: Project specifications and requirements
+- src/: Source code implementation
+- .ralph/examples/: Example usage and test cases
+- .ralph/fix_plan.md: Prioritized TODO list
+- .ralph/AGENT.md: Project build and run instructions
 
 ## Current Task
-Follow @fix_plan.md and choose the most important item to implement next.
+Follow .ralph/fix_plan.md and choose the most important item to implement next.
 Use your judgment to prioritize what will have the biggest impact on project progress.
 
 Remember: Quality over speed. Build it right the first time. Know when you're done.
@@ -659,18 +681,26 @@ EOF
 
 # Create gitignore
 cat > .gitignore << 'EOF'
-# Ralph generated files
-.call_count
-.last_reset
-.exit_signals
-status.json
+# Ralph generated files (inside .ralph/ subfolder)
+.ralph/.call_count
+.ralph/.last_reset
+.ralph/.exit_signals
+.ralph/status.json
+.ralph/.ralph_session
+.ralph/.ralph_session_history
+.ralph/.claude_session_id
+.ralph/.response_analysis
+.ralph/.circuit_breaker_state
+.ralph/.circuit_breaker_history
 
-# Logs
-logs/
+# Ralph logs and generated docs
+.ralph/logs/*
+!.ralph/logs/.gitkeep
+.ralph/docs/generated/*
+!.ralph/docs/generated/.gitkeep
+
+# General logs
 *.log
-
-# Generated documentation
-docs/generated/
 
 # OS files
 .DS_Store
@@ -695,6 +725,9 @@ target/
 .idea/
 *.swp
 *.swo
+
+# Ralph backup directories (created by migration)
+.ralph_backup_*
 EOF
 
 # Make scripts executable

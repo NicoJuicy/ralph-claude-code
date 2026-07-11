@@ -110,7 +110,10 @@ tests/
 │   ├── test_project_setup.bats     # Project setup (setup.sh) (36 tests)
 │   └── test_prd_import.bats        # PRD import workflow (33 tests)
 │
-├── e2e/                            # End-to-end tests (planned)
+├── e2e/                            # End-to-end tests
+│   ├── test_full_loop.bats         # Full ralph_loop.sh subprocess runs (13 tests)
+│   └── helpers/
+│       └── e2e_helper.bash         # Mock claude CLI + temp project harness
 │
 └── helpers/                        # Shared test utilities
     ├── test_helper.bash            # Assertions and setup functions
@@ -130,7 +133,7 @@ tests/
 
 - **Test files**: `test_<component_name>.bats`
 - **Test functions**: Descriptive sentences: `@test "can_make_call returns success when under limit"`
-- **Location**: Place tests in `unit/` or `integration/` based on scope
+- **Location**: Place tests in `unit/`, `integration/`, or `e2e/` based on scope
 
 ---
 
@@ -429,7 +432,7 @@ $EXIT_SIGNALS_FILE  # ".exit_signals"
 
 # Mock data creation
 create_mock_prompt          # Create sample PROMPT.md
-create_mock_fix_plan 5 2    # Create @fix_plan.md (5 total, 2 completed)
+create_mock_fix_plan 5 2    # Create fix_plan.md (5 total, 2 completed)
 create_mock_status 1 42 100 # Create status.json (loop 1, 42 calls, 100 max)
 create_mock_exit_signals 0 2 0  # Create exit signals (0 test, 2 done, 0 complete)
 ```
@@ -513,12 +516,12 @@ create_sample_prd_json "output.json" # JSON PRD
 ```bash
 # Create sample Ralph project files
 create_sample_prompt "PROMPT.md"
-create_sample_fix_plan "@fix_plan.md" 10 3  # 10 tasks, 3 completed
-create_sample_agent_md "@AGENT.md"
+create_sample_fix_plan "fix_plan.md" 10 3  # 10 tasks, 3 completed
+create_sample_agent_md "AGENT.md"
 
 # Create complete project structure
 create_test_project "project-name"
-# Creates: PROMPT.md, @fix_plan.md, @AGENT.md, specs/, src/, logs/, etc.
+# Creates: PROMPT.md, fix_plan.md, AGENT.md, specs/, src/, logs/, etc.
 ```
 
 #### Output Fixtures
@@ -629,7 +632,7 @@ test:
     - run: npm install && sudo apt-get install -y jq
     - run: npm run test:unit          # Must pass
     - run: npm run test:integration   # Allowed to fail (|| true)
-    - run: npm run test:e2e          # Allowed to fail (|| true)
+    - run: npm run test:e2e          # Must pass
 ```
 
 #### 2. Coverage Job (Informational)

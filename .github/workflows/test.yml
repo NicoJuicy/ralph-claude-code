@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# Least-privilege token: this workflow only reads the repo (tests + coverage
+# artifact upload need no write scopes)
+permissions:
+  contents: read
+
 env:
   # Coverage threshold - configurable, not hardcoded
   # Set to 0 to disable threshold enforcement
@@ -22,10 +27,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      with:
+        # Test jobs never push — don't persist GITHUB_TOKEN in git config (#282)
+        persist-credentials: false
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: '18'
 
@@ -42,22 +50,29 @@ jobs:
       run: npm run test:integration || true
 
     - name: Run E2E tests
-      run: npm run test:e2e || true
+      run: npm run test:e2e
+      timeout-minutes: 15
 
     - name: Generate test report
       run: |
-        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "✅ Unit tests passed" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## Test Results"
+          echo "✅ Unit tests passed"
+          echo "✅ E2E tests passed"
+        } >> "$GITHUB_STEP_SUMMARY"
 
   coverage:
     runs-on: ubuntu-latest
     needs: test
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      with:
+        # Test jobs never push — don't persist GITHUB_TOKEN in git config (#282)
+        persist-credentials: false
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: '18'
 
@@ -176,7 +191,7 @@ jobs:
         fi
 
     - name: Upload coverage artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: always()
       with:
         name: coverage-report
@@ -184,7 +199,7 @@ jobs:
         retention-days: 7
 
     - name: Upload coverage to Codecov (optional)
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       if: always()
       continue-on-error: true
       with:

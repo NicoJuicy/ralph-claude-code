@@ -31,6 +31,7 @@ setup() {
     echo "# Mock PROMPT.md" > "$MOCK_SOURCE_DIR/templates/PROMPT.md"
     echo "# Mock fix_plan.md" > "$MOCK_SOURCE_DIR/templates/fix_plan.md"
     echo "# Mock AGENT.md" > "$MOCK_SOURCE_DIR/templates/AGENT.md"
+    echo ".ralph/.call_count" > "$MOCK_SOURCE_DIR/templates/.gitignore"
 
     # Create mock lib files
     cat > "$MOCK_SOURCE_DIR/lib/circuit_breaker.sh" << 'EOF'
@@ -74,6 +75,61 @@ EOF
 #!/bin/bash
 # Mock setup.sh
 echo "Setup running"
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/migrate_to_ralph_folder.sh" << 'EOF'
+#!/bin/bash
+# Mock migrate_to_ralph_folder.sh
+echo "Migration running"
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/ralph_enable.sh" << 'EOF'
+#!/bin/bash
+# Mock ralph_enable.sh
+echo "Ralph enable running"
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/ralph_enable_ci.sh" << 'EOF'
+#!/bin/bash
+# Mock ralph_enable_ci.sh
+echo "Ralph enable CI running"
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/ralph-stats.sh" << 'EOF'
+#!/bin/bash
+# Mock ralph-stats.sh
+echo "Ralph stats running"
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/ralph_queue.sh" << 'EOF'
+#!/bin/bash
+# Mock ralph_queue.sh
+echo "Ralph queue running"
+EOF
+
+    # Create mock lib files for new enable functionality
+    cat > "$MOCK_SOURCE_DIR/lib/enable_core.sh" << 'EOF'
+#!/bin/bash
+# Mock enable_core.sh
+check_existing_ralph() { :; }
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/lib/wizard_utils.sh" << 'EOF'
+#!/bin/bash
+# Mock wizard_utils.sh
+confirm() { :; }
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/lib/task_sources.sh" << 'EOF'
+#!/bin/bash
+# Mock task_sources.sh
+fetch_beads_tasks() { :; }
+EOF
+
+    cat > "$MOCK_SOURCE_DIR/lib/timeout_utils.sh" << 'EOF'
+#!/bin/bash
+# Mock timeout_utils.sh
+portable_timeout() { timeout "$@"; }
 EOF
 
     chmod +x "$MOCK_SOURCE_DIR"/*.sh
@@ -155,17 +211,21 @@ run_install() {
 @test "install.sh creates ~/.local/bin commands" {
     run run_install
 
-    # Check all four wrapper commands exist
+    # Check all five wrapper commands exist
     assert_file_exists "$TEST_INSTALL_DIR/ralph"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-monitor"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-setup"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-import"
+    assert_file_exists "$TEST_INSTALL_DIR/ralph-migrate"
+    assert_file_exists "$TEST_INSTALL_DIR/ralph-queue"
 
     # Verify each command contains proper shebang
     grep -q "#!/bin/bash" "$TEST_INSTALL_DIR/ralph"
     grep -q "#!/bin/bash" "$TEST_INSTALL_DIR/ralph-monitor"
     grep -q "#!/bin/bash" "$TEST_INSTALL_DIR/ralph-setup"
     grep -q "#!/bin/bash" "$TEST_INSTALL_DIR/ralph-import"
+    grep -q "#!/bin/bash" "$TEST_INSTALL_DIR/ralph-migrate"
+    grep -q "#!/bin/bash" "$TEST_INSTALL_DIR/ralph-queue"
 }
 
 @test "install.sh sets executable permissions" {
@@ -176,12 +236,18 @@ run_install() {
     [[ -x "$TEST_INSTALL_DIR/ralph-monitor" ]]
     [[ -x "$TEST_INSTALL_DIR/ralph-setup" ]]
     [[ -x "$TEST_INSTALL_DIR/ralph-import" ]]
+    [[ -x "$TEST_INSTALL_DIR/ralph-migrate" ]]
+    [[ -x "$TEST_INSTALL_DIR/ralph-stats" ]]
+    [[ -x "$TEST_INSTALL_DIR/ralph-queue" ]]
 
     # Verify executable bit on main scripts
     [[ -x "$TEST_RALPH_HOME/ralph_loop.sh" ]]
     [[ -x "$TEST_RALPH_HOME/ralph_monitor.sh" ]]
     [[ -x "$TEST_RALPH_HOME/setup.sh" ]]
     [[ -x "$TEST_RALPH_HOME/ralph_import.sh" ]]
+    [[ -x "$TEST_RALPH_HOME/migrate_to_ralph_folder.sh" ]]
+    [[ -x "$TEST_RALPH_HOME/ralph-stats.sh" ]]
+    [[ -x "$TEST_RALPH_HOME/ralph_queue.sh" ]]
 
     # Verify lib scripts are executable
     [[ -x "$TEST_RALPH_HOME/lib/circuit_breaker.sh" ]]
@@ -205,6 +271,13 @@ run_install() {
     diff -q "$MOCK_SOURCE_DIR/templates/PROMPT.md" "$TEST_RALPH_HOME/templates/PROMPT.md"
     diff -q "$MOCK_SOURCE_DIR/templates/fix_plan.md" "$TEST_RALPH_HOME/templates/fix_plan.md"
     diff -q "$MOCK_SOURCE_DIR/templates/AGENT.md" "$TEST_RALPH_HOME/templates/AGENT.md"
+}
+
+@test "install.sh copies dotfile templates like .gitignore" {
+    run run_install
+
+    assert_file_exists "$TEST_RALPH_HOME/templates/.gitignore"
+    diff -q "$MOCK_SOURCE_DIR/templates/.gitignore" "$TEST_RALPH_HOME/templates/.gitignore"
 }
 
 @test "install.sh copies lib/ directory" {
@@ -428,6 +501,9 @@ EOF
     assert_file_exists "$TEST_INSTALL_DIR/ralph-monitor"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-setup"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-import"
+    assert_file_exists "$TEST_INSTALL_DIR/ralph-migrate"
+    assert_file_exists "$TEST_INSTALL_DIR/ralph-stats"
+    assert_file_exists "$TEST_INSTALL_DIR/ralph-queue"
 
     # Run uninstall
     run run_install uninstall
@@ -438,6 +514,9 @@ EOF
     assert_file_not_exists "$TEST_INSTALL_DIR/ralph-monitor"
     assert_file_not_exists "$TEST_INSTALL_DIR/ralph-setup"
     assert_file_not_exists "$TEST_INSTALL_DIR/ralph-import"
+    assert_file_not_exists "$TEST_INSTALL_DIR/ralph-migrate"
+    assert_file_not_exists "$TEST_INSTALL_DIR/ralph-stats"
+    assert_file_not_exists "$TEST_INSTALL_DIR/ralph-queue"
 }
 
 @test "install.sh uninstall cleans up directories" {
@@ -511,6 +590,7 @@ EOF
     assert_file_exists "$TEST_INSTALL_DIR/ralph-monitor"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-setup"
     assert_file_exists "$TEST_INSTALL_DIR/ralph-import"
+    assert_file_exists "$TEST_INSTALL_DIR/ralph-migrate"
 
     # Verify all templates copied
     assert_file_exists "$TEST_RALPH_HOME/templates/PROMPT.md"
@@ -527,6 +607,7 @@ EOF
     assert_file_exists "$TEST_RALPH_HOME/ralph_monitor.sh"
     assert_file_exists "$TEST_RALPH_HOME/setup.sh"
     assert_file_exists "$TEST_RALPH_HOME/ralph_import.sh"
+    assert_file_exists "$TEST_RALPH_HOME/migrate_to_ralph_folder.sh"
 
     # Verify all permissions correct
     [[ -x "$TEST_INSTALL_DIR/ralph" ]]

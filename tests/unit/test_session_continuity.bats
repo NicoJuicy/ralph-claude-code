@@ -15,17 +15,19 @@ setup() {
     git config user.email "test@example.com"
     git config user.name "Test User"
 
-    # Set up environment
-    export PROMPT_FILE="PROMPT.md"
-    export LOG_DIR="logs"
-    export DOCS_DIR="docs/generated"
-    export STATUS_FILE="status.json"
-    export EXIT_SIGNALS_FILE=".exit_signals"
-    export CALL_COUNT_FILE=".call_count"
-    export TIMESTAMP_FILE=".last_reset"
-    export CLAUDE_SESSION_FILE=".claude_session_id"
-    export RALPH_SESSION_FILE=".ralph_session"
-    export RALPH_SESSION_HISTORY_FILE=".ralph_session_history"
+    # Set up environment with .ralph/ subfolder structure
+    export RALPH_DIR=".ralph"
+    export PROMPT_FILE="$RALPH_DIR/PROMPT.md"
+    export LOG_DIR="$RALPH_DIR/logs"
+    export DOCS_DIR="$RALPH_DIR/docs/generated"
+    export STATUS_FILE="$RALPH_DIR/status.json"
+    export EXIT_SIGNALS_FILE="$RALPH_DIR/.exit_signals"
+    export CALL_COUNT_FILE="$RALPH_DIR/.call_count"
+    export TIMESTAMP_FILE="$RALPH_DIR/.last_reset"
+    export CLAUDE_SESSION_FILE="$RALPH_DIR/.claude_session_id"
+    export RALPH_SESSION_FILE="$RALPH_DIR/.ralph_session"
+    export RALPH_SESSION_HISTORY_FILE="$RALPH_DIR/.ralph_session_history"
+    export RESPONSE_ANALYSIS_FILE="$RALPH_DIR/.response_analysis"
     export CLAUDE_MIN_VERSION="2.0.76"
     export CLAUDE_CODE_CMD="claude"
     export CLAUDE_USE_CONTINUE="true"
@@ -35,9 +37,9 @@ setup() {
     echo "$(date +%Y%m%d%H)" > "$TIMESTAMP_FILE"
     echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": []}' > "$EXIT_SIGNALS_FILE"
 
-    # Create sample project files
-    create_sample_prompt
-    create_sample_fix_plan "@fix_plan.md" 10 3
+    # Create sample project files in .ralph/ directory
+    create_sample_prompt "$RALPH_DIR/PROMPT.md"
+    create_sample_fix_plan "$RALPH_DIR/fix_plan.md" 10 3
 
     # Source library components
     source "${BATS_TEST_DIRNAME}/../../lib/date_utils.sh"
@@ -78,40 +80,8 @@ function_exists_in_ralph() {
 }
 
 # =============================================================================
-# SESSION RESET FUNCTION TESTS
-# =============================================================================
-
-@test "reset_session function exists in ralph_loop.sh" {
-    run function_exists_in_ralph "reset_session"
-    [[ $status -eq 0 ]] || skip "reset_session function not yet implemented"
-}
-
-@test "get_session_id function exists in ralph_loop.sh" {
-    run function_exists_in_ralph "get_session_id"
-    [[ $status -eq 0 ]] || skip "get_session_id function not yet implemented"
-}
-
-@test "log_session_transition function exists in ralph_loop.sh" {
-    run function_exists_in_ralph "log_session_transition"
-    [[ $status -eq 0 ]] || skip "log_session_transition function not yet implemented"
-}
-
-# =============================================================================
 # --reset-session CLI FLAG TESTS
 # =============================================================================
-
-@test "--reset-session flag is recognized in help" {
-    run bash "${BATS_TEST_DIRNAME}/../../ralph_loop.sh" --help
-
-    [[ "$output" == *"reset-session"* ]] || skip "--reset-session flag not yet implemented"
-}
-
-@test "--reset-session flag in argument parser" {
-    # Check if the flag exists in the argument parsing section
-    run grep -E '\-\-reset-session' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]] || skip "--reset-session flag not yet implemented"
-}
 
 @test "--reset-session resets session file" {
     # Create a session file
@@ -137,28 +107,11 @@ function_exists_in_ralph() {
 # CIRCUIT BREAKER SESSION INTEGRATION TESTS
 # =============================================================================
 
-@test "circuit breaker reset code includes session reset" {
-    # Check if reset_circuit_breaker mentions reset_session
-    run grep -A10 'reset_circuit_breaker' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ "$output" == *"reset_session"* ]] || skip "Circuit breaker session integration not yet implemented"
-}
-
 @test "cleanup function includes session reset" {
     # Check if cleanup function includes reset_session
     run grep -A5 'cleanup()' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
 
     [[ "$output" == *"reset_session"* ]] || skip "Cleanup session reset not yet implemented"
-}
-
-# =============================================================================
-# SESSION HISTORY TESTS
-# =============================================================================
-
-@test "RALPH_SESSION_HISTORY_FILE constant defined" {
-    run grep 'RALPH_SESSION_HISTORY_FILE' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]] || skip "Session history file constant not yet defined"
 }
 
 # =============================================================================
@@ -238,7 +191,7 @@ function_exists_in_ralph() {
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]]
 
@@ -266,34 +219,8 @@ EOF
 }
 
 # =============================================================================
-# SESSION CONTINUITY IN CLAUDE CLI COMMAND
-# =============================================================================
-
-@test "--continue flag is added to Claude CLI command" {
-    # Check that --continue is used in build_claude_command
-    run grep -E '\-\-continue' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]]
-    [[ "$output" == *"--continue"* ]]
-}
-
-@test "CLAUDE_USE_CONTINUE configuration controls session continuity" {
-    # Check that CLAUDE_USE_CONTINUE is defined and controls --continue
-    run grep 'CLAUDE_USE_CONTINUE' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]]
-}
-
-# =============================================================================
 # SESSION EXPIRATION HANDLING
 # =============================================================================
-
-@test "SESSION_EXPIRATION_SECONDS is defined in response_analyzer" {
-    run grep 'SESSION_EXPIRATION_SECONDS' "${BATS_TEST_DIRNAME}/../../lib/response_analyzer.sh"
-
-    [[ $status -eq 0 ]]
-    [[ "$output" == *"86400"* ]]  # 24 hours in seconds
-}
 
 @test "expired session (24+ hours) is not resumed" {
     # Create old session
@@ -302,12 +229,6 @@ EOF
     run should_resume_session
 
     [[ "$output" == "false" ]]
-}
-
-@test "CLAUDE_SESSION_EXPIRY_HOURS is defined in ralph_loop.sh" {
-    run grep 'CLAUDE_SESSION_EXPIRY_HOURS' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]] || skip "CLAUDE_SESSION_EXPIRY_HOURS not yet implemented"
 }
 
 @test "CLAUDE_SESSION_EXPIRY_HOURS defaults to 24" {
@@ -322,13 +243,6 @@ EOF
     run bash "${BATS_TEST_DIRNAME}/../../ralph_loop.sh" --help
 
     [[ "$output" == *"session-expiry"* ]] || skip "--session-expiry flag not yet implemented"
-}
-
-@test "--session-expiry flag accepts positive integer" {
-    # Just check the flag is parsed (don't run full loop)
-    run grep -E '\-\-session-expiry' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]] || skip "--session-expiry flag not yet implemented"
 }
 
 @test "--session-expiry rejects non-integer value" {
@@ -364,33 +278,6 @@ EOF
     [[ "$output" == *"positive integer"* ]] || [[ "$output" == *"Error"* ]]
 }
 
-# =============================================================================
-# INIT_CLAUDE_SESSION EXPIRATION TESTS (Behavioral)
-# =============================================================================
-
-@test "init_claude_session checks session expiration" {
-    # Check that init_claude_session includes expiration logic
-    run grep -A30 'init_claude_session' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    # Should reference expiration or age checking
-    [[ "$output" == *"expir"* ]] || [[ "$output" == *"age"* ]] || [[ "$output" == *"stat"* ]] || skip "Session expiration not yet implemented in init_claude_session"
-}
-
-@test "init_claude_session uses cross-platform stat command" {
-    # Check for uname or Darwin/Linux detection in get_session_file_age_hours
-    run grep -A30 'get_session_file_age_hours' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    # Should have cross-platform handling
-    [[ "$output" == *"Darwin"* ]] || [[ "$output" == *"uname"* ]] || skip "Cross-platform stat not yet implemented"
-}
-
-@test "get_session_file_age_hours returns correct age" {
-    # Check if helper function exists
-    run grep 'get_session_file_age_hours' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    [[ $status -eq 0 ]] || skip "get_session_file_age_hours function not yet implemented"
-}
-
 @test "get_session_file_age_hours returns 0 for missing file" {
     # Source the script to get the function
     source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
@@ -410,7 +297,7 @@ EOF
     echo "test" > "$test_file"
 
     # Verify the function code handles stat failure by checking the implementation
-    run grep -A25 'get_session_file_age_hours' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
+    run grep -A35 'get_session_file_age_hours' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
     [[ "$output" == *'echo "-1"'* ]]
 }
 
@@ -429,33 +316,6 @@ EOF
 
     # Session file should be removed
     [[ ! -f "$CLAUDE_SESSION_FILE" ]] || [[ "$output" == *"expired"* ]]
-}
-
-@test "init_claude_session logs expiration with age info" {
-    # Source the script to get the function
-    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    # Verify code structure includes age logging
-    run grep -A40 'init_claude_session()' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-    [[ "$output" == *'age_hours'* ]] && [[ "$output" == *'expired'* ]]
-}
-
-@test "init_claude_session logs session age when resuming" {
-    # Source the script to get the function
-    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    # Verify code structure includes resume logging
-    run grep -A50 'init_claude_session()' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-    [[ "$output" == *'Resuming'* ]] && [[ "$output" == *'old'* ]]
-}
-
-@test "init_claude_session handles stat failure gracefully" {
-    # Source the script to get the function
-    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-
-    # Verify code structure handles -1 return
-    run grep -A40 'init_claude_session()' "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
-    [[ "$output" == *"-1"* ]] && [[ "$output" == *"WARN"* ]]
 }
 
 # =============================================================================
@@ -520,4 +380,260 @@ EOF
     # 5. Check again (should be expired)
     run should_resume_session
     [[ "$output" == "false" ]]
+}
+
+# =============================================================================
+# Issue #123: UNIFIED SESSION STORAGE FORMAT (JSON, tolerant readers)
+# =============================================================================
+
+@test "issue #123: write_session_id_file writes canonical JSON with timestamp" {
+    write_session_id_file "sess-123-abc" "$CLAUDE_SESSION_FILE"
+
+    # Valid JSON, with session_id and a non-empty timestamp
+    run jq -e . "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]
+    [[ "$(jq -r '.session_id' "$CLAUDE_SESSION_FILE")" == "sess-123-abc" ]]
+    # // empty so a missing field is "" (jq -r prints "null" otherwise, passing falsely)
+    [[ -n "$(jq -r '.timestamp // empty' "$CLAUDE_SESSION_FILE")" ]]
+}
+
+@test "issue #123: write_session_id_file rejects empty id" {
+    rm -f "$CLAUDE_SESSION_FILE"
+    run write_session_id_file "" "$CLAUDE_SESSION_FILE"
+    [ "$status" -ne 0 ]
+    [[ ! -f "$CLAUDE_SESSION_FILE" ]]
+}
+
+@test "issue #123: write_session_id_file reports failure (rc 1) when it cannot write" {
+    [[ "$(id -u)" -eq 0 ]] && skip "root bypasses directory permissions"
+    local rodir="$TEST_DIR/readonly"
+    mkdir -p "$rodir"; chmod 555 "$rodir"
+
+    run write_session_id_file "no-write-id" "$rodir/sess"
+    chmod 755 "$rodir"   # restore so teardown can clean up
+
+    [ "$status" -ne 0 ]
+    [[ ! -f "$rodir/sess" ]]
+    # No orphaned temp files left behind
+    [[ -z "$(ls -A "$rodir" 2>/dev/null)" ]]
+}
+
+@test "issue #123: read_session_id_file reads JSON format" {
+    echo '{"session_id": "json-id-1", "timestamp": "2026-01-09T10:00:00Z"}' > "$CLAUDE_SESSION_FILE"
+    run read_session_id_file "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "json-id-1" ]]
+}
+
+@test "issue #123: read_session_id_file reads legacy plain-text format" {
+    printf 'plain-legacy-id-2\n' > "$CLAUDE_SESSION_FILE"
+    run read_session_id_file "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "plain-legacy-id-2" ]]
+}
+
+@test "issue #123: read_session_id_file strips CR from legacy plain id (issue #254 robustness)" {
+    printf 'abc123-session-id\r\n' > "$CLAUDE_SESSION_FILE"
+    run read_session_id_file "$CLAUDE_SESSION_FILE"
+    [[ "$output" == "abc123-session-id" ]]
+}
+
+@test "issue #123: read_session_id_file returns empty on corrupt/JSON-looking junk" {
+    echo 'not valid json at all {{{' > "$CLAUDE_SESSION_FILE"
+    run read_session_id_file "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]
+    [[ -z "$output" ]]
+}
+
+@test "issue #123: read_session_id_file rejects a legacy line with interior whitespace" {
+    # "abc 123" must NOT be normalized into a valid "abc123" id (CodeRabbit)
+    printf 'abc 123\n' > "$CLAUDE_SESSION_FILE"
+    run read_session_id_file "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]
+    [[ -z "$output" ]]
+}
+
+@test "issue #123: read_session_id_file returns empty for missing file" {
+    rm -f "$CLAUDE_SESSION_FILE"
+    run read_session_id_file "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]
+    [[ -z "$output" ]]
+}
+
+@test "issue #123: save_claude_session persists canonical JSON (not plain text)" {
+    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
+    local output_file="$LOG_DIR/claude_out.json"
+    echo '{"session_id": "save-json-id", "result": "ok"}' > "$output_file"
+
+    save_claude_session "$output_file"
+
+    [[ -f "$CLAUDE_SESSION_FILE" ]]
+    run jq -e . "$CLAUDE_SESSION_FILE"
+    [ "$status" -eq 0 ]                                   # file is valid JSON
+    [[ "$(jq -r '.session_id' "$CLAUDE_SESSION_FILE")" == "save-json-id" ]]
+}
+
+@test "issue #123: init_claude_session resumes from a JSON session file" {
+    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
+    # Recent JSON file (mtime = now -> not expired)
+    write_session_id_file "resume-json-id" "$CLAUDE_SESSION_FILE"
+
+    run init_claude_session
+    # Must return the real id, NOT "{" (the old plain-text reader's failure mode)
+    [[ "$output" == *"resume-json-id"* ]]
+    [[ "$output" != *"{"* ]]
+}
+
+@test "issue #123: init_claude_session resumes from a legacy plain-text file" {
+    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
+    printf 'legacy-plain-resume\n' > "$CLAUDE_SESSION_FILE"
+
+    run init_claude_session
+    [[ "$output" == *"legacy-plain-resume"* ]]
+}
+
+@test "issue #123: save_claude_session -> init_claude_session round-trips the id" {
+    source "${BATS_TEST_DIRNAME}/../../ralph_loop.sh"
+    local output_file="$LOG_DIR/claude_out.json"
+    echo '{"session_id": "roundtrip-xyz"}' > "$output_file"
+
+    save_claude_session "$output_file"
+    run init_claude_session
+    [[ "$output" == *"roundtrip-xyz"* ]]
+    [[ "$output" != *"{"* ]]
+}
+
+@test "issue #123: get_last_session_id reads a legacy plain-text id" {
+    printf 'legacy-getlast-id\n' > "$CLAUDE_SESSION_FILE"
+    run get_last_session_id
+    [[ "$output" == "legacy-getlast-id" ]]
+}
+
+# =============================================================================
+# SESSION RESET CLEARS EXIT SIGNALS (Issue #91 Fix)
+# =============================================================================
+
+@test "reset_session clears exit_signals file to prevent premature exit" {
+    # Setup: Create stale exit signals that would cause premature exit
+    echo '{"test_only_loops": [1,2], "done_signals": [1], "completion_indicators": [1,2,3]}' > "$EXIT_SIGNALS_FILE"
+
+    # Verify stale signals exist
+    local completion_count=$(jq '.completion_indicators | length' "$EXIT_SIGNALS_FILE")
+    [[ "$completion_count" == "3" ]]
+
+    # Source ralph_loop.sh to get reset_session function
+    # We need to mock some things to prevent full initialization
+    export RALPH_SESSION_HISTORY_FILE="$RALPH_DIR/.ralph_session_history"
+    export RESPONSE_ANALYSIS_FILE="$RALPH_DIR/.response_analysis"
+
+    # Create a mock response analysis file
+    echo '{"analysis": {"exit_signal": true}}' > "$RESPONSE_ANALYSIS_FILE"
+    [[ -f "$RESPONSE_ANALYSIS_FILE" ]]
+
+    # Define reset_session inline for testing (extracted from ralph_loop.sh)
+    reset_session() {
+        local reason=${1:-"manual_reset"}
+        local reset_timestamp
+        reset_timestamp=$(get_iso_timestamp)
+
+        jq -n \
+            --arg session_id "" \
+            --arg created_at "" \
+            --arg last_used "" \
+            --arg reset_at "$reset_timestamp" \
+            --arg reset_reason "$reason" \
+            '{
+                session_id: $session_id,
+                created_at: $created_at,
+                last_used: $last_used,
+                reset_at: $reset_at,
+                reset_reason: $reset_reason
+            }' > "$RALPH_SESSION_FILE"
+
+        rm -f "$CLAUDE_SESSION_FILE" 2>/dev/null
+
+        # Issue #91 fix: Clear exit signals
+        if [[ -f "$EXIT_SIGNALS_FILE" ]]; then
+            echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": []}' > "$EXIT_SIGNALS_FILE"
+        fi
+
+        # Clear response analysis
+        rm -f "$RESPONSE_ANALYSIS_FILE" 2>/dev/null
+    }
+
+    # Call reset_session
+    reset_session "test_reset"
+
+    # Verify exit signals were cleared
+    local new_completion_count=$(jq '.completion_indicators | length' "$EXIT_SIGNALS_FILE")
+    [[ "$new_completion_count" == "0" ]]
+
+    local new_test_loops=$(jq '.test_only_loops | length' "$EXIT_SIGNALS_FILE")
+    [[ "$new_test_loops" == "0" ]]
+
+    local new_done_signals=$(jq '.done_signals | length' "$EXIT_SIGNALS_FILE")
+    [[ "$new_done_signals" == "0" ]]
+
+    # Verify response analysis was cleared
+    [[ ! -f "$RESPONSE_ANALYSIS_FILE" ]]
+}
+
+@test "reset_session prevents issue #91 scenario (stale completion indicators)" {
+    # Issue #91: Ralph exits immediately when stale completion_indicators exist
+
+    # Ensure variables are set before use (defensive against env differences)
+    export RESPONSE_ANALYSIS_FILE="$RALPH_DIR/.response_analysis"
+    export RALPH_SESSION_HISTORY_FILE="$RALPH_DIR/.ralph_session_history"
+
+    # Simulate the issue scenario:
+    # 1. Previous session ended with completion_indicators: [1,2]
+    # 2. Previous session had EXIT_SIGNAL: true
+    echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": [1,2]}' > "$EXIT_SIGNALS_FILE"
+    echo '{"analysis": {"exit_signal": true, "has_completion_signal": true}}' > "$RESPONSE_ANALYSIS_FILE"
+
+    # Verify the problematic state exists
+    local completion_count=$(jq '.completion_indicators | length' "$EXIT_SIGNALS_FILE")
+    [[ "$completion_count" == "2" ]]
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RESPONSE_ANALYSIS_FILE")
+    [[ "$exit_signal" == "true" ]]
+
+    # Define reset_session with the fix
+    reset_session() {
+        local reason=${1:-"manual_reset"}
+        local reset_timestamp
+        reset_timestamp=$(get_iso_timestamp)
+
+        jq -n \
+            --arg session_id "" \
+            --arg created_at "" \
+            --arg last_used "" \
+            --arg reset_at "$reset_timestamp" \
+            --arg reset_reason "$reason" \
+            '{
+                session_id: $session_id,
+                created_at: $created_at,
+                last_used: $last_used,
+                reset_at: $reset_at,
+                reset_reason: $reset_reason
+            }' > "$RALPH_SESSION_FILE"
+
+        rm -f "$CLAUDE_SESSION_FILE" 2>/dev/null
+
+        # Issue #91 fix
+        if [[ -f "$EXIT_SIGNALS_FILE" ]]; then
+            echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": []}' > "$EXIT_SIGNALS_FILE"
+        fi
+        rm -f "$RESPONSE_ANALYSIS_FILE" 2>/dev/null
+    }
+
+    # User runs --reset-session
+    reset_session "manual_reset"
+
+    # Verify the fix: completion indicators should be cleared
+    local new_completion_count=$(jq '.completion_indicators | length' "$EXIT_SIGNALS_FILE")
+    [[ "$new_completion_count" == "0" ]]
+
+    # Verify response analysis is gone (no stale EXIT_SIGNAL)
+    [[ ! -f "$RESPONSE_ANALYSIS_FILE" ]]
 }

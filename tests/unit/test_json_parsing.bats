@@ -15,12 +15,13 @@ setup() {
     git config user.email "test@example.com"
     git config user.name "Test User"
 
-    # Set up environment
-    export PROMPT_FILE="PROMPT.md"
-    export LOG_DIR="logs"
-    export DOCS_DIR="docs/generated"
-    export STATUS_FILE="status.json"
-    export EXIT_SIGNALS_FILE=".exit_signals"
+    # Set up environment with .ralph/ subfolder structure
+    export RALPH_DIR=".ralph"
+    export PROMPT_FILE="$RALPH_DIR/PROMPT.md"
+    export LOG_DIR="$RALPH_DIR/logs"
+    export DOCS_DIR="$RALPH_DIR/docs/generated"
+    export STATUS_FILE="$RALPH_DIR/status.json"
+    export EXIT_SIGNALS_FILE="$RALPH_DIR/.exit_signals"
 
     mkdir -p "$LOG_DIR" "$DOCS_DIR"
     echo '{"test_only_loops": [], "done_signals": [], "completion_indicators": []}' > "$EXIT_SIGNALS_FILE"
@@ -124,7 +125,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     # Should create result file with parsed values
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
@@ -145,7 +146,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -166,7 +167,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -187,7 +188,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -207,7 +208,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -228,7 +229,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -248,7 +249,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -271,7 +272,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -312,7 +313,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -342,9 +343,9 @@ EOF
     local result=$?
 
     assert_equal "$result" "0"
-    assert_file_exists ".response_analysis"
+    assert_file_exists "$RALPH_DIR/.response_analysis"
 
-    local exit_signal=$(jq -r '.analysis.exit_signal' .response_analysis)
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
     assert_equal "$exit_signal" "true"
 }
 
@@ -361,10 +362,10 @@ EOF
     local result=$?
 
     assert_equal "$result" "0"
-    assert_file_exists ".response_analysis"
+    assert_file_exists "$RALPH_DIR/.response_analysis"
 
     # Should still detect completion via text parsing
-    local has_completion=$(jq -r '.analysis.has_completion_signal' .response_analysis)
+    local has_completion=$(jq -r '.analysis.has_completion_signal' "$RALPH_DIR/.response_analysis")
     assert_equal "$has_completion" "true"
 }
 
@@ -382,7 +383,7 @@ EOF
     analyze_response "$output_file" 1
 
     # JSON with explicit exit_signal should have high confidence
-    local confidence=$(jq -r '.analysis.confidence_score' .response_analysis)
+    local confidence=$(jq -r '.analysis.confidence_score' "$RALPH_DIR/.response_analysis")
     [[ "$confidence" -ge 50 ]]
 }
 
@@ -405,10 +406,10 @@ EOF
 
     analyze_response "$output_file" 1
 
-    local exit_signal=$(jq -r '.analysis.exit_signal' .response_analysis)
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
     assert_equal "$exit_signal" "true"
 
-    local confidence=$(jq -r '.analysis.confidence_score' .response_analysis)
+    local confidence=$(jq -r '.analysis.confidence_score' "$RALPH_DIR/.response_analysis")
     [[ "$confidence" -ge 100 ]]
 }
 
@@ -423,7 +424,7 @@ EOF
 
     analyze_response "$output_file" 1
 
-    local has_completion=$(jq -r '.analysis.has_completion_signal' .response_analysis)
+    local has_completion=$(jq -r '.analysis.has_completion_signal' "$RALPH_DIR/.response_analysis")
     assert_equal "$has_completion" "true"
 }
 
@@ -438,7 +439,7 @@ EOF
 
     analyze_response "$output_file" 1
 
-    local is_test_only=$(jq -r '.analysis.is_test_only' .response_analysis)
+    local is_test_only=$(jq -r '.analysis.is_test_only' "$RALPH_DIR/.response_analysis")
     assert_equal "$is_test_only" "true"
 }
 
@@ -480,7 +481,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -500,7 +501,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -523,7 +524,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -546,7 +547,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -573,7 +574,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -597,7 +598,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -623,7 +624,7 @@ EOF
 EOF
 
     run parse_json_response "$output_file"
-    local result_file=".json_parse_result"
+    local result_file="$RALPH_DIR/.json_parse_result"
 
     [[ -f "$result_file" ]] || skip "parse_json_response not yet implemented"
 
@@ -648,12 +649,12 @@ EOF
 
     analyze_response "$output_file" 1
 
-    assert_file_exists ".response_analysis"
+    assert_file_exists "$RALPH_DIR/.response_analysis"
 
-    local exit_signal=$(jq -r '.analysis.exit_signal' .response_analysis)
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
     assert_equal "$exit_signal" "true"
 
-    local output_format=$(jq -r '.output_format' .response_analysis)
+    local output_format=$(jq -r '.output_format' "$RALPH_DIR/.response_analysis")
     assert_equal "$output_format" "json"
 }
 
@@ -670,70 +671,629 @@ EOF
     analyze_response "$output_file" 1
 
     # Session ID should be persisted for continuity
-    [[ -f ".claude_session_id" ]] || skip "Session persistence not yet implemented"
+    [[ -f "$RALPH_DIR/.claude_session_id" ]] || skip "Session persistence not yet implemented"
 
-    local stored_session=$(cat .claude_session_id)
+    local stored_session=$(cat "$RALPH_DIR/.claude_session_id")
     [[ "$stored_session" == *"session-persist-test-123"* ]]
 }
 
 # =============================================================================
-# SESSION MANAGEMENT FUNCTION TESTS
+# CLAUDE CLI JSON ARRAY FORMAT TESTS (Issue #112)
+# =============================================================================
+# Tests for the Claude CLI JSON array output format:
+# [ {type: "system", ...}, {type: "assistant", ...}, {type: "result", ...} ]
+
+@test "detect_output_format identifies JSON array as json" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    # Create Claude CLI array format output
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-init-123"},
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "Working..."}]}},
+    {"type": "result", "subtype": "success", "result": "Task completed", "session_id": "session-result-123"}
+]
+EOF
+
+    run detect_output_format "$output_file"
+    assert_equal "$output" "json"
+}
+
+@test "parse_json_response handles Claude CLI JSON array format" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    # Create Claude CLI array format output (as shown in issue #112)
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "hook_response", "session_id": "session-abc123"},
+    {"type": "system", "subtype": "init", "session_id": "session-abc123", "tools": ["Write", "Read"]},
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "Implementing feature..."}]}},
+    {"type": "result", "subtype": "success", "result": "All tasks completed successfully.", "session_id": "session-abc123", "is_error": false, "duration_ms": 5000}
+]
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Should extract result text into summary
+    local summary=$(jq -r '.summary' "$result_file")
+    [[ "$summary" == *"All tasks completed"* ]]
+}
+
+@test "parse_json_response extracts session_id from Claude CLI array init message" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-unique-from-init"},
+    {"type": "result", "subtype": "success", "result": "Done"}
+]
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    local session_id=$(jq -r '.session_id' "$result_file")
+    assert_equal "$session_id" "session-unique-from-init"
+}
+
+@test "parse_json_response handles empty array gracefully" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    echo '[]' > "$output_file"
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Should have default/empty values
+    local status_val=$(jq -r '.status' "$result_file")
+    assert_equal "$status_val" "UNKNOWN"
+}
+
+@test "parse_json_response handles array without result type message" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-no-result"},
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "Working..."}]}}
+]
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Should still work with defaults
+    local session_id=$(jq -r '.session_id' "$result_file")
+    assert_equal "$session_id" "session-no-result"
+}
+
+@test "parse_json_response extracts is_error from Claude CLI array result" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-error-test"},
+    {"type": "result", "subtype": "error", "result": "Failed to complete", "is_error": true, "duration_ms": 1000}
+]
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+}
+
+@test "analyze_response handles Claude CLI JSON array and extracts signals" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-analyze-array"},
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "All work complete."}]}},
+    {"type": "result", "subtype": "success", "result": "Project complete and ready for review.", "is_error": false}
+]
+EOF
+
+    analyze_response "$output_file" 1
+
+    assert_file_exists "$RALPH_DIR/.response_analysis"
+
+    local output_format=$(jq -r '.output_format' "$RALPH_DIR/.response_analysis")
+    assert_equal "$output_format" "json"
+}
+
+@test "analyze_response persists session_id from Claude CLI array format" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-persist-array-test"},
+    {"type": "result", "subtype": "success", "result": "Working on task."}
+]
+EOF
+
+    analyze_response "$output_file" 1
+
+    # Session ID should be persisted for continuity
+    [[ -f "$RALPH_DIR/.claude_session_id" ]]
+
+    local stored_session=$(cat "$RALPH_DIR/.claude_session_id")
+    [[ "$stored_session" == *"session-persist-array-test"* ]]
+}
+
+# Regression test: arrays where only result element carries session_id (review fix: CodeRabbit)
+@test "parse_json_response extracts session_id from result object when no init message" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    # Array with session_id only in result object, no init message
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "Working..."}]}},
+    {"type": "result", "subtype": "success", "result": "Task complete.", "session_id": "session-in-result-only"}
+]
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Session ID should be extracted from result object
+    local session_id=$(jq -r '.session_id' "$result_file")
+    assert_equal "$session_id" "session-in-result-only"
+}
+
+# =============================================================================
+# PERMISSION DENIAL DETECTION TESTS (Issue #101)
+# =============================================================================
+# Tests for detecting permission_denials from Claude Code JSON output.
+# When Claude Code is denied permission to execute commands (e.g., npm install),
+# the JSON output contains a permission_denials array that Ralph should detect.
+
+@test "parse_json_response detects permission_denials array" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    # Create JSON output with permission denials (as Claude Code outputs)
+    cat > "$output_file" << 'EOF'
+{
+    "result": "I tried to run npm install but was denied permission.",
+    "sessionId": "session-denied-123",
+    "is_error": false,
+    "permission_denials": [
+        {"tool": "Bash", "command": "npm install", "reason": "Tool not in allowed list"}
+    ]
+}
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Should extract has_permission_denials flag
+    local has_denials=$(jq -r '.has_permission_denials' "$result_file")
+    assert_equal "$has_denials" "true"
+}
+
+@test "parse_json_response extracts permission_denial_count" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+{
+    "result": "Multiple commands were denied.",
+    "sessionId": "session-multi-deny",
+    "permission_denials": [
+        {"tool": "Bash", "command": "npm install", "reason": "Not allowed"},
+        {"tool": "Bash", "command": "pnpm install", "reason": "Not allowed"},
+        {"tool": "Bash", "command": "yarn add lodash", "reason": "Not allowed"}
+    ]
+}
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Should count denials correctly
+    local denial_count=$(jq -r '.permission_denial_count' "$result_file")
+    assert_equal "$denial_count" "3"
+}
+
+@test "parse_json_response extracts denied_commands list" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    # Use real Claude CLI output structure with tool_input.command
+    cat > "$output_file" << 'EOF'
+{
+    "result": "Permission denied for npm install",
+    "sessionId": "session-extract-cmds",
+    "permission_denials": [
+        {"tool_name": "Bash", "tool_use_id": "toolu_123", "tool_input": {"command": "npm install express"}}
+    ]
+}
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    # Should extract the denied commands from tool_input.command
+    local denied_cmds=$(jq -r '.denied_commands[0]' "$result_file")
+    [[ "$denied_cmds" == *"npm install"* ]]
+}
+
+@test "parse_json_response defaults correctly when permission_denials absent or empty" {
+    local output_file="$LOG_DIR/test_output.log"
+    local result_file="$RALPH_DIR/.json_parse_result"
+
+    # Case 1: empty array
+    cat > "$output_file" << 'EOF'
+{
+    "result": "All commands executed successfully.",
+    "sessionId": "session-no-denials",
+    "permission_denials": []
+}
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+    [[ -f "$result_file" ]]
+    assert_equal "$(jq -r '.has_permission_denials' "$result_file")" "false"
+    assert_equal "$(jq -r '.permission_denial_count' "$result_file")" "0"
+
+    # Case 2: missing field entirely (backward compat)
+    cat > "$output_file" << 'EOF'
+{
+    "status": "COMPLETE",
+    "exit_signal": true,
+    "work_type": "IMPLEMENTATION",
+    "files_modified": 5
+}
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+    [[ -f "$result_file" ]]
+    assert_equal "$(jq -r '.has_permission_denials' "$result_file")" "false"
+    assert_equal "$(jq -r '.permission_denial_count' "$result_file")" "0"
+}
+
+@test "analyze_response includes permission denial info in analysis result" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+{
+    "result": "Tried npm install but permission was denied.",
+    "sessionId": "session-analyze-denial",
+    "permission_denials": [
+        {"tool": "Bash", "command": "npm install", "reason": "Tool not allowed"}
+    ]
+}
+EOF
+
+    analyze_response "$output_file" 1
+
+    assert_file_exists "$RALPH_DIR/.response_analysis"
+
+    # Should include permission denial in analysis
+    local has_denials=$(jq -r '.analysis.has_permission_denials' "$RALPH_DIR/.response_analysis")
+    assert_equal "$has_denials" "true"
+
+    local denial_count=$(jq -r '.analysis.permission_denial_count' "$RALPH_DIR/.response_analysis")
+    assert_equal "$denial_count" "1"
+}
+
+@test "parse_json_response handles Claude CLI array format with permission denials" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    # Claude CLI array format with permission denials in result
+    cat > "$output_file" << 'EOF'
+[
+    {"type": "system", "subtype": "init", "session_id": "session-array-deny"},
+    {"type": "assistant", "message": {"content": [{"type": "text", "text": "Trying to install..."}]}},
+    {
+        "type": "result",
+        "subtype": "success",
+        "result": "Could not run npm install - permission denied",
+        "session_id": "session-array-deny",
+        "permission_denials": [
+            {"tool": "Bash", "command": "npm install", "reason": "Not in allowed tools"}
+        ]
+    }
+]
+EOF
+
+    run parse_json_response "$output_file"
+    assert_equal "$status" "0"
+
+    local result_file="$RALPH_DIR/.json_parse_result"
+    [[ -f "$result_file" ]]
+
+    local has_denials=$(jq -r '.has_permission_denials' "$result_file")
+    assert_equal "$has_denials" "true"
+}
+
+# =============================================================================
+# QUESTION DETECTION TESTS (Issue #190 Bug 2)
 # =============================================================================
 
-@test "store_session_id writes session to file with timestamp" {
-    run store_session_id "session-test-abc"
+@test "detect_questions detects question pattern with question mark" {
+    run detect_questions "Should I implement approach A or B?"
 
-    [[ -f ".claude_session_id" ]] || skip "store_session_id not yet implemented"
-
-    local content=$(cat .claude_session_id)
-    [[ "$content" == *"session-test-abc"* ]]
+    assert_success
+    [[ "$output" -gt 0 ]]
 }
 
-@test "get_last_session_id retrieves stored session" {
-    # First store a session
-    echo '{"session_id": "session-retrieve-test", "timestamp": "2026-01-09T10:00:00Z"}' > .claude_session_id
+@test "detect_questions returns 0 count for normal implementation text" {
+    run detect_questions "Implementing module. Tests passed. All done."
 
-    run get_last_session_id
-
-    [[ "$output" == *"session-retrieve-test"* ]] || skip "get_last_session_id not yet implemented"
+    assert_failure
+    assert_output "0"
 }
 
-@test "get_last_session_id returns empty when no session file" {
-    rm -f .claude_session_id
+@test "detect_questions ignores non-matching word order" {
+    run detect_questions "I should implement the conservative approach."
 
-    run get_last_session_id
-
-    # Should return empty string, not error
-    [[ "$status" -eq 0 ]] || skip "get_last_session_id not yet implemented"
-    [[ -z "$output" || "$output" == "" || "$output" == "null" ]]
+    assert_failure
+    assert_output "0"
 }
 
-@test "should_resume_session returns true for recent session" {
-    # Store a recent session (simulated as current timestamp)
-    local now=$(date +%s)
-    echo "{\"session_id\": \"session-recent\", \"timestamp\": \"$(date -Iseconds)\"}" > .claude_session_id
+@test "detect_questions returns 0 for empty input" {
+    run detect_questions ""
 
-    run should_resume_session
-
-    # Should indicate session can be resumed
-    [[ "$status" -eq 0 ]] || skip "should_resume_session not yet implemented"
+    assert_failure
+    assert_output "0"
 }
 
-@test "should_resume_session returns false for old session" {
-    # Store an old session (24+ hours ago)
-    echo '{"session_id": "session-old", "timestamp": "2020-01-01T00:00:00Z"}' > .claude_session_id
+@test "detect_questions counts multiple questions" {
+    local text="Should I use approach A? Would you prefer option B? What should I do next?"
 
-    run should_resume_session
+    run detect_questions "$text"
 
-    # Should indicate session expired
-    [[ "$status" -ne 0 || "$output" == "false" ]] || skip "should_resume_session not yet implemented"
+    assert_success
+    [[ "$output" -ge 2 ]]
 }
 
-@test "should_resume_session returns false when no session file" {
-    rm -f .claude_session_id
+@test "detect_questions detects declarative wait pattern without question mark" {
+    run detect_questions "Please confirm the approach before proceeding."
 
-    run should_resume_session
+    assert_success
+    [[ "$output" -gt 0 ]]
+}
 
-    # Should indicate no session to resume
-    [[ "$status" -ne 0 || "$output" == "false" ]] || skip "should_resume_session not yet implemented"
+@test "detect_questions detects awaiting input pattern without question mark" {
+    run detect_questions "Awaiting your input on the design decision."
+
+    assert_success
+    [[ "$output" -gt 0 ]]
+}
+
+# =============================================================================
+# HEURISTIC EXIT THRESHOLD TESTS (Issue #224)
+# =============================================================================
+
+@test "JSON mode without RALPH_STATUS block: completion keywords do not trigger exit" {
+    # Regression test for Issue #224
+    # Writing a CHANGELOG or README with "done"/"complete" should NOT exit
+    local output_file="$LOG_DIR/test_output.log"
+    cat > "$output_file" << 'EOF'
+{"type":"result","subtype":"success","result":"I've updated the CHANGELOG.\n\n## v1.2.0\n- Implementation complete\n- Setup is done\n- All tasks finished\n\nThe documentation has been updated successfully."}
+EOF
+
+    run analyze_response "$output_file" 1 "$RALPH_DIR/.response_analysis"
+    assert_success
+
+    local exit_signal
+    exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "JSON mode without RALPH_STATUS block: multiple documentation completion phrases do not trigger exit" {
+    # Even heavy use of completion language in JSON mode should not exit without EXIT_SIGNAL
+    local output_file="$LOG_DIR/test_output.log"
+    cat > "$output_file" << 'EOF'
+{"type":"result","subtype":"success","result":"Updated README: setup complete, installation done, configuration finished, all steps completed."}
+EOF
+
+    run analyze_response "$output_file" 1 "$RALPH_DIR/.response_analysis"
+    assert_success
+
+    local exit_signal
+    exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "text mode: requires both confidence>=70 AND has_completion_signal to exit" {
+    # Text mode should exit only when BOTH conditions are met.
+    # Here: keyword match gives has_completion_signal=true and confidence=10.
+    # No .ralph/.loop_start_sha means the git-change boost (+20) does not fire.
+    # Total confidence (10) is well below 70 — should NOT exit.
+    local output_file="$LOG_DIR/test_output.log"
+    cat > "$output_file" << 'EOF'
+All tasks are done. The implementation is complete.
+EOF
+
+    run analyze_response "$output_file" 1 "$RALPH_DIR/.response_analysis"
+    assert_success
+
+    local exit_signal
+    exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "text mode: has_completion_signal alone (confidence<70) does not trigger exit" {
+    # A single keyword match sets has_completion_signal=true but score=10 — must NOT exit
+    local output_file="$LOG_DIR/test_output.log"
+    cat > "$output_file" << 'EOF'
+The feature is done.
+EOF
+
+    run analyze_response "$output_file" 1 "$RALPH_DIR/.response_analysis"
+    assert_success
+
+    local exit_signal
+    exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+# =============================================================================
+# YAML COLON-BLOCK RALPH_STATUS FORMAT TESTS
+# =============================================================================
+# Some agent prompts emit the structured-status block as YAML (colon heading +
+# indented keys) instead of the canonical "---RALPH_STATUS---" separator
+# markers. The detection regex extends to match either form so EXIT_SIGNAL is
+# read out of both layouts; the downstream `grep "EXIT_SIGNAL:" | cut | xargs`
+# extraction is layout-agnostic.
+
+@test "text mode: YAML colon-block RALPH_STATUS with EXIT_SIGNAL=true triggers exit" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+Investigation complete.
+
+RALPH_STATUS:
+  EXIT_SIGNAL: true
+  reason: "All tasks complete"
+
+End of response.
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "true"
+}
+
+@test "text mode: YAML colon-block RALPH_STATUS with EXIT_SIGNAL=false does not trigger exit" {
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+Made progress on the auth module.
+
+RALPH_STATUS:
+  EXIT_SIGNAL: false
+  reason: "More work needed on the session layer"
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "JSON mode .result field with YAML colon-block RALPH_STATUS triggers exit" {
+    # Claude CLI JSON wrapper format: structured response with .result string
+    # containing a YAML colon-block RALPH_STATUS section. Mirrors the
+    # ".result + ---RALPH_STATUS---" path tested elsewhere; verifies the
+    # extended regex catches the YAML form too.
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+{
+    "result": "Implementation done.\n\nRALPH_STATUS:\n  EXIT_SIGNAL: true\n  reason: \"Project complete\"\n",
+    "sessionId": "test-session-001"
+}
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "true"
+}
+
+@test "JSON mode .result field with YAML colon-block EXIT_SIGNAL=false respects continue intent" {
+    # YAML emit can also signal "continue working" — explicit EXIT_SIGNAL: false
+    # must be respected the same way the separator-marker form is.
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+{
+    "result": "Phase 1 done.\n\nRALPH_STATUS:\n  EXIT_SIGNAL: false\n  reason: \"Phase 2 still pending\"\n",
+    "sessionId": "test-session-002"
+}
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "text mode: inline RALPH_STATUS: in prose does NOT trigger gate" {
+    # Regression: the regex must anchor to start-of-line so prose mentions of
+    # "RALPH_STATUS:" don't accidentally enter the EXIT_SIGNAL extraction block.
+    # Without anchoring, a sentence like "see the RALPH_STATUS: emit format
+    # documented above" would match the gate. With anchoring, only a block
+    # header at start-of-line matches.
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+Working on the documentation update.
+
+I added a paragraph that mentions the RALPH_STATUS: emit format inline,
+referencing the canonical layout. No actual block was emitted.
+
+EXIT_SIGNAL: true should also not trigger by itself without a header.
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "JSON mode .result field with inline RALPH_STATUS: in prose does NOT trigger gate" {
+    # Regression: same line-anchor concern but in the JSON-mode .result path.
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+{
+    "result": "Updating the README. The RALPH_STATUS: section now describes both formats. EXIT_SIGNAL: true would be a block-emit not an inline reference, so no gate trigger here.",
+    "sessionId": "test-session-prose"
+}
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "false"
+}
+
+@test "text mode: leading-whitespace RALPH_STATUS: header DOES trigger gate (indented YAML block)" {
+    # The anchor allows optional leading whitespace so indented blocks (e.g.,
+    # nested YAML or quoted in tool output) still match the gate.
+    local output_file="$LOG_DIR/test_output.log"
+
+    cat > "$output_file" << 'EOF'
+Some context lines.
+
+  RALPH_STATUS:
+    EXIT_SIGNAL: true
+    reason: "Done"
+EOF
+
+    analyze_response "$output_file" 1
+
+    local exit_signal=$(jq -r '.analysis.exit_signal' "$RALPH_DIR/.response_analysis")
+    assert_equal "$exit_signal" "true"
 }
